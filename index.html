@@ -1,101 +1,120 @@
-<!-- Secure & Share Govt Document Project -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Secure Doc Share</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Secure & Share Govt Documents</title>
   <link rel="stylesheet" href="style.css">
-  <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore.js"></script>
 </head>
 <body>
   <div id="app">
-    <!-- Simple UI Sections: Login/Register, Upload Simulated, Profile, Share -->
     <h1>Secure & Share Govt Documents</h1>
-    <div id="auth-section">
-      <input id="email" type="email" placeholder="Email">
-      <input id="password" type="password" placeholder="Password">
-      <button onclick="register()">Register</button>
-      <button onclick="login()">Login</button>
-      <button onclick="logout()">Logout</button>
-    </div>
 
-    <div id="doc-section">
-      <h3>Simulate Upload Document</h3>
-      <input id="docTitle" placeholder="Title" />
-      <input id="docUrl" placeholder="Document URL (simulated)" />
-      <button onclick="uploadDocument()">Save Document</button>
-      <div id="doc-list"></div>
-    </div>
+    <input type="email" id="email" placeholder="Email" />
+    <input type="password" id="password" placeholder="Password" />
+    <button onclick="register()">Register</button>
+    <button onclick="login()">Login</button>
+    <button onclick="logout()">Logout</button>
+
+    <h3>Simulate Upload Document</h3>
+    <input type="text" id="docTitle" placeholder="Document Title" />
+    <input type="text" id="docURL" placeholder="Document URL (simulated)" />
+    <button onclick="saveDocument()">Save Document</button>
+
+    <h3>Your Documents</h3>
+    <ul id="docList"></ul>
   </div>
 
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.4.0/firebase-firestore-compat.js"></script>
+
   <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyCCVbi-JPGLBMeXoU-CJ8Uds0zyrBP-_Sc",
-      authDomain: "docshare-5cbf3.firebaseapp.com",
-      projectId: "docshare-5cbf3",
-      storageBucket: "docshare-5cbf3.firebasestorage.app",
-      messagingSenderId: "860103685314",
-      appId: "1:860103685314:web:6b749c33eeeb1bc0fcf75b"
-    };
-    
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
+    window.onload = function () {
+      const firebaseConfig = {
+        apiKey: "AIzaSyCCVbi-JPGLBMeXoU-CJ8Uds0zyrBP-_Sc",
+        authDomain: "docshare-5cbf3.firebaseapp.com",
+        projectId: "docshare-5cbf3",
+        storageBucket: "docshare-5cbf3.appspot.com",
+        messagingSenderId: "860103685314",
+        appId: "1:860103685314:web:6b749c33eeeb1bc0fcf75b"
+      };
 
-    function register() {
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-      auth.createUserWithEmailAndPassword(email, password).then(() => {
-        alert("Registered successfully");
-      }).catch(e => alert(e.message));
-    }
+      firebase.initializeApp(firebaseConfig);
+      const auth = firebase.auth();
+      const db = firebase.firestore();
 
-    function login() {
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-      auth.signInWithEmailAndPassword(email, password).then(() => {
-        alert("Logged in");
-        loadDocuments();
-      }).catch(e => alert(e.message));
-    }
+      function updateDocumentList(userId) {
+        const docList = document.getElementById('docList');
+        docList.innerHTML = '';
+        db.collection('documents')
+          .where('userId', '==', userId)
+          .get()
+          .then(snapshot => {
+            snapshot.forEach(doc => {
+              const data = doc.data();
+              const li = document.createElement('li');
+              li.innerHTML = `<strong>${data.title}</strong>: <a href="${data.url}" target="_blank">Open</a>`;
+              docList.appendChild(li);
+            });
+          });
+      }
 
-    function logout() {
-      auth.signOut().then(() => alert("Logged out"));
-    }
+      window.register = function () {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        auth.createUserWithEmailAndPassword(email, password)
+          .then(() => {
+            alert('Registered successfully');
+          })
+          .catch(err => alert(err.message));
+      };
 
-    function uploadDocument() {
-      const title = document.getElementById('docTitle').value;
-      const url = document.getElementById('docUrl').value;
-      const user = auth.currentUser;
-      if (!user) return alert("Login required");
+      window.login = function () {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        auth.signInWithEmailAndPassword(email, password)
+          .then(userCredential => {
+            const user = userCredential.user;
+            alert('Logged in!');
+            updateDocumentList(user.uid);
+          })
+          .catch(err => alert(err.message));
+      };
 
-      db.collection("documents").add({
-        uid: user.uid,
-        title,
-        url,
-        timestamp: new Date()
-      }).then(() => {
-        alert("Document saved");
-        loadDocuments();
-      });
-    }
-
-    function loadDocuments() {
-      const user = auth.currentUser;
-      if (!user) return;
-      db.collection("documents").where("uid", "==", user.uid).get().then(snapshot => {
-        let html = "<ul>";
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          html += `<li><a href="${data.url}" target="_blank">${data.title}</a></li>`;
+      window.logout = function () {
+        auth.signOut().then(() => {
+          alert('Logged out');
+          document.getElementById('docList').innerHTML = '';
         });
-        html += "</ul>";
-        document.getElementById('doc-list').innerHTML = html;
+      };
+
+      window.saveDocument = function () {
+        const title = document.getElementById('docTitle').value;
+        const url = document.getElementById('docURL').value;
+        const user = auth.currentUser;
+        if (!user) {
+          alert('Login first!');
+          return;
+        }
+        db.collection('documents').add({
+          userId: user.uid,
+          title,
+          url,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(() => {
+          alert('Document saved!');
+          updateDocumentList(user.uid);
+        });
+      };
+
+      auth.onAuthStateChanged(user => {
+        if (user) {
+          updateDocumentList(user.uid);
+        }
       });
-    }
+    };
   </script>
 </body>
 </html>
